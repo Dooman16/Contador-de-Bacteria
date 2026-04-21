@@ -1,43 +1,69 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
-
-# Cargar imagen en escala de grises
-img = cv2.imread("colonias.jpg", cv2.IMREAD_GRAYSCALE)
-
-# Binarizar (blanco/negro)
-_, thresh = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
-
-# Encontrar componentes conectados
-num_labels, labels = cv2.connectedComponents(thresh)
-
-# Restamos 1 porque el fondo cuenta como etiqueta
-cantidad_puntos = num_labels - 1
 
 def nothing(x):
     pass
 
-# Crear ventana
-cv2.namedWindow("Control")
+# Cargar imagen
+img = cv2.imread("colonias.jpg")
 
-# Crear slider (0–255)
-cv2.createTrackbar("Threshold", "Control", 193, 255, nothing)
+# Escala de grises
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+# Ventana y slider
+cv2.namedWindow("Control")
+cv2.createTrackbar("Threshold", "Control", 150, 255, nothing)
+
+# Parámetros del detector de blobs
+params = cv2.SimpleBlobDetector_Params()
+
+params.filterByArea = True
+params.minArea = 20
+params.maxArea = 50000
+
+params.filterByCircularity = False
+params.filterByConvexity = False
+params.filterByInertia = False
+
+# Detectar blobs claros (colonias blancas)
+params.filterByColor = True
+params.blobColor = 255
+
+detector = cv2.SimpleBlobDetector_create(params)
 
 while True:
-    # Leer valor del slider
     thresh_val = cv2.getTrackbarPos("Threshold", "Control")
 
-    # Aplicar threshold dinámico
-    _, thresh = cv2.threshold(img, thresh_val, 255, cv2.THRESH_BINARY)
+    # Threshold
+    _, thresh = cv2.threshold(gray, thresh_val, 255, cv2.THRESH_BINARY)
 
-    # Mostrar resultado
-    cv2.imshow("Imagen original", img)
-    cv2.imshow("Threshold", thresh)
+    # Limpiar ruido
+    kernel = np.ones((1,1), np.uint8)
+    clean = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
 
-    # Salir con ESC
+    # Detectar blobs
+    keypoints = detector.detect(clean)
+
+    # Dibujar blobs
+    output = cv2.drawKeypoints(
+        img,
+        keypoints,
+        None,
+        (0, 0, 255),
+        cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
+    )
+
+    # Mostrar conteo en pantalla
+    cv2.putText(output, f"Colonias: {len(keypoints)}",
+                (20, 40), cv2.FONT_HERSHEY_SIMPLEX,
+                1, (0, 255, 0), 2)
+
+    # Mostrar ventanas
+
+    cv2.imshow("Threshold", clean)
+    cv2.imshow("Blobs", output)
+
     if cv2.waitKey(1) == 27:
         break
 
 cv2.destroyAllWindows()
-
-print("Cantidad de puntos:", cantidad_puntos)
